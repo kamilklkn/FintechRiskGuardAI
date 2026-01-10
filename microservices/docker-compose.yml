@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # API Gateway (Port 8000)
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AGENT_SERVICE_URL=http://agent-service:8001
+      - TASK_SERVICE_URL=http://task-service:8002
+      - MEMORY_SERVICE_URL=http://memory-service:8003
+    depends_on:
+      - agent-service
+      - task-service
+      - memory-service
+    volumes:
+      - ../api/static:/app/static:ro
+    networks:
+      - microservices
+
+  # Agent Service (Port 8001)
+  agent-service:
+    build:
+      context: .
+      dockerfile: agent-service/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=sqlite:///./data/agents.db
+    volumes:
+      - agent-data:/app/data
+    networks:
+      - microservices
+
+  # Task Service (Port 8002)
+  task-service:
+    build:
+      context: .
+      dockerfile: task-service/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=sqlite:///./data/tasks.db
+      - AGENT_SERVICE_URL=http://agent-service:8001
+    volumes:
+      - task-data:/app/data
+    depends_on:
+      - agent-service
+    networks:
+      - microservices
+
+  # Memory Service (Port 8003)
+  memory-service:
+    build:
+      context: .
+      dockerfile: memory-service/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=sqlite:///./data/memory.db
+    volumes:
+      - memory-data:/app/data
+    networks:
+      - microservices
+
+volumes:
+  agent-data:
+  task-data:
+  memory-data:
+
+networks:
+  microservices:
+    driver: bridge

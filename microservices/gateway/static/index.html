@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Agent Framework - Admin Panel</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <i class="fas fa-robot"></i>
+            <h2>Agent Framework</h2>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="#dashboard" class="nav-item active" data-section="dashboard">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#agents" class="nav-item" data-section="agents">
+                <i class="fas fa-robot"></i>
+                <span>Agents</span>
+            </a>
+            <a href="#tasks" class="nav-item" data-section="tasks">
+                <i class="fas fa-tasks"></i>
+                <span>Tasks</span>
+            </a>
+            <a href="#sessions" class="nav-item" data-section="sessions">
+                <i class="fas fa-history"></i>
+                <span>Sessions</span>
+            </a>
+            <a href="#risk-scoring" class="nav-item" data-section="risk-scoring">
+                <i class="fas fa-shield-alt"></i>
+                <span>Risk Scoring</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <h1 id="page-title">Dashboard</h1>
+            <div class="header-actions">
+                <span id="api-status" class="status-badge">
+                    <i class="fas fa-circle"></i> Checking...
+                </span>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="section active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #667eea;">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="total-agents">0</h3>
+                        <p>Total Agents</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #f093fb;">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="total-tasks">0</h3>
+                        <p>Total Tasks</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #4facfe;">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="total-sessions">0</h3>
+                        <p>Sessions</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #43e97b;">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="total-risk-scores">0</h3>
+                        <p>Risk Scores</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Quick Execute</h2>
+                <form id="quick-execute-form">
+                    <div class="form-group">
+                        <label>Model</label>
+                        <select id="quick-model">
+                            <option value="ollama/llama3.2">Ollama - llama3.2</option>
+                            <option value="openai/gpt-4">OpenAI - GPT-4</option>
+                            <option value="anthropic/claude-3-5-sonnet">Anthropic - Claude 3.5 Sonnet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Task Description</label>
+                        <textarea id="quick-task" rows="3" placeholder="What do you want the agent to do?"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Execute
+                    </button>
+                </form>
+                <div id="quick-result" class="result-box" style="display: none;"></div>
+            </div>
+        </section>
+
+        <!-- Agents Section -->
+        <section id="agents-section" class="section">
+            <div class="section-header">
+                <h2>Agents</h2>
+                <button class="btn btn-primary" onclick="showCreateAgentForm()">
+                    <i class="fas fa-plus"></i> Create Agent
+                </button>
+            </div>
+
+            <div id="create-agent-form" class="card" style="display: none;">
+                <h3>Create New Agent</h3>
+                <form id="agent-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Name *</label>
+                            <input type="text" id="agent-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Model *</label>
+                            <select id="agent-model" required>
+                                <option value="ollama/llama3.2">Ollama - llama3.2</option>
+                                <option value="openai/gpt-4">OpenAI - GPT-4</option>
+                                <option value="anthropic/claude-3-5-sonnet">Anthropic - Claude 3.5 Sonnet</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Role</label>
+                            <input type="text" id="agent-role" placeholder="e.g., Research Assistant">
+                        </div>
+                        <div class="form-group">
+                            <label>Goal</label>
+                            <input type="text" id="agent-goal" placeholder="e.g., Help users find information">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Instructions</label>
+                        <textarea id="agent-instructions" rows="3" placeholder="Detailed instructions for the agent..."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Create Agent
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="hideCreateAgentForm()">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <div id="agents-list"></div>
+            </div>
+        </section>
+
+        <!-- Tasks Section -->
+        <section id="tasks-section" class="section">
+            <div class="section-header">
+                <h2>Tasks</h2>
+                <button class="btn btn-primary" onclick="showExecuteTaskForm()">
+                    <i class="fas fa-play"></i> Execute Task
+                </button>
+            </div>
+
+            <div id="execute-task-form" class="card" style="display: none;">
+                <h3>Execute New Task</h3>
+                <form id="task-form">
+                    <div class="form-group">
+                        <label>Select Agent *</label>
+                        <select id="task-agent" required>
+                            <option value="">Select an agent...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Task Description *</label>
+                        <textarea id="task-description" rows="4" required placeholder="What should the agent do?"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-play"></i> Execute
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="hideExecuteTaskForm()">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <div id="tasks-list"></div>
+            </div>
+        </section>
+
+        <!-- Sessions Section -->
+        <section id="sessions-section" class="section">
+            <div class="section-header">
+                <h2>Sessions</h2>
+                <button class="btn btn-primary" onclick="showCreateSessionForm()">
+                    <i class="fas fa-plus"></i> Create Session
+                </button>
+            </div>
+
+            <div id="create-session-form" class="card" style="display: none;">
+                <h3>Create New Session</h3>
+                <form id="session-form">
+                    <div class="form-group">
+                        <label>Session ID *</label>
+                        <input type="text" id="session-id" required placeholder="e.g., user-123-session">
+                    </div>
+                    <div class="form-group">
+                        <label>Storage Type</label>
+                        <select id="storage-type">
+                            <option value="memory">Memory</option>
+                            <option value="sqlite">SQLite</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Create
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="hideCreateSessionForm()">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <div id="sessions-list"></div>
+            </div>
+        </section>
+
+        <!-- Risk Scoring Section -->
+        <section id="risk-scoring-section" class="section">
+            <div class="tabs-container">
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="showRiskTab('new-application')">
+                        <i class="fas fa-plus-circle"></i> Yeni Başvuru
+                    </button>
+                    <button class="tab-btn" onclick="showRiskTab('applications')">
+                        <i class="fas fa-list"></i> Başvurular
+                    </button>
+                    <button class="tab-btn" onclick="showRiskTab('send-report')">
+                        <i class="fas fa-envelope"></i> Rapor Gönder
+                    </button>
+                </div>
+
+                <!-- New Application Tab -->
+                <div id="new-application" class="tab-content active">
+                    <div class="card">
+                        <h2><i class="fas fa-building"></i> Şirket Bilgileri</h2>
+                        <form id="risk-application-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Şirket Tipi *</label>
+                                    <select id="company_type" required>
+                                        <option value="">Seçiniz</option>
+                                        <option value="LIMITED">Limited Şirket</option>
+                                        <option value="ANONIM">Anonim Şirket</option>
+                                        <option value="SAHIS">Şahıs Şirketi</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Üye İşyeri Adı *</label>
+                                    <input type="text" id="merchant_name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Ticaret Ünvanı *</label>
+                                    <input type="text" id="trade_name" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>MERSIS Numarası</label>
+                                    <input type="text" id="mersis_number" maxlength="16">
+                                </div>
+                                <div class="form-group">
+                                    <label>Aylık Ciro (TL)</label>
+                                    <input type="number" id="monthly_revenue" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label>Hosting VKN</label>
+                                    <input type="text" id="hosting_vkn" maxlength="10">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Website URL</label>
+                                    <input type="url" id="hosting_url" placeholder="https://">
+                                </div>
+                                <div class="form-group">
+                                    <label>BKM Numarası</label>
+                                    <input type="text" id="bkm_number">
+                                </div>
+                                <div class="form-group">
+                                    <label>Şehir *</label>
+                                    <input type="text" id="city" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>İlçe *</label>
+                                    <input type="text" id="district" required>
+                                </div>
+                                <div class="form-group" style="grid-column: span 2;">
+                                    <label>Adres *</label>
+                                    <textarea id="address" rows="2" required></textarea>
+                                </div>
+                            </div>
+
+                            <h3 style="margin-top: 30px;"><i class="fas fa-user"></i> Yetkili Bilgileri</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>TC Kimlik No *</label>
+                                    <input type="text" id="tc_number" maxlength="11" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>İsim *</label>
+                                    <input type="text" id="first_name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Soyisim *</label>
+                                    <input type="text" id="last_name" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>E-posta *</label>
+                                    <input type="email" id="email" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Şirket E-posta</label>
+                                    <input type="email" id="company_email">
+                                </div>
+                                <div class="form-group">
+                                    <label>Cep Telefonu *</label>
+                                    <input type="tel" id="mobile_phone" required>
+                                </div>
+                            </div>
+
+                            <div style="text-align: center; margin-top: 30px;">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-check-circle"></i> Risk Analizi Başlat
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Applications List Tab -->
+                <div id="applications" class="tab-content">
+                    <div class="card">
+                        <h2><i class="fas fa-list"></i> Risk Skorlama Başvuruları</h2>
+                        <div id="applications-content"></div>
+                    </div>
+                </div>
+
+                <!-- Send Report Tab -->
+                <div id="send-report" class="tab-content">
+                    <div class="card">
+                        <h2><i class="fas fa-envelope"></i> Risk Raporu Gönder</h2>
+                        <form id="send-report-form">
+                            <div class="form-group">
+                                <label>Başvuru ID *</label>
+                                <input type="text" id="report_application_id" required>
+                            </div>
+                            <h3 style="margin: 20px 0;">E-posta Alıcıları</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Risk ve Uyum</label>
+                                    <input type="email" class="recipient-email" data-dept="Risk ve Uyum" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Operasyon</label>
+                                    <input type="email" class="recipient-email" data-dept="Operasyon" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Fraud</label>
+                                    <input type="email" class="recipient-email" data-dept="Fraud" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Product</label>
+                                    <input type="email" class="recipient-email" data-dept="Product" required>
+                                </div>
+                            </div>
+                            <div style="text-align: center; margin-top: 20px;">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane"></i> Raporu Gönder
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alert-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
