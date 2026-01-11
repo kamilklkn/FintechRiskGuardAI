@@ -1,5 +1,5 @@
 """Risk Scoring Service - Analyzes merchant applications and provides risk scores"""
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, String, DateTime, JSON, Float, Text
@@ -8,6 +8,11 @@ import sys
 import os
 import uuid
 import json
+import re
+from typing import List
+from PIL import Image
+import pytesseract
+import io
 
 # Add shared to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -436,6 +441,333 @@ async def list_risk_scores(db: Session = Depends(get_db)):
         }
         for app in apps
     ]
+
+# ============ OCR DOCUMENT PROCESSING ============
+
+@app.post("/ocr-extract")
+async def ocr_extract_data(files: List[UploadFile] = File(...)):
+    """
+    Extract merchant information from uploaded documents using Tesseract OCR + AI
+    Processes: Tax plates, trade registry, MERSIS documents, contracts
+    """
+    try:
+        extracted_data = {}
+        all_texts = []
+
+        # Process each uploaded file with real OCR
+        for file in files:
+            content = await file.read()
+
+            # Perform OCR on image
+            try:
+                image = Image.open(io.BytesIO(content))
+                # Use Tesseract to extract text (Turkish + English)
+                ocr_text = pytesseract.image_to_string(image, lang='tur+eng')
+                all_texts.append(ocr_text)
+                print(f"OCR extracted from {file.filename}:\n{ocr_text[:500]}...")  # Debug
+
+            except Exception as ocr_error:
+                print(f"OCR error for {file.filename}: {str(ocr_error)}")
+                continue
+
+        # Combine all extracted texts
+        combined_text = "\n\n".join(all_texts)
+
+        # Use AI agent to intelligently parse the OCR text
+        if combined_text.strip():
+            agent = create_ocr_agent()
+
+            prompt = f"""
+            Aşağıdaki OCR ile çıkarılan metinden merchant bilgilerini çıkar.
+            Türkçe karakterlere dikkat et (ş, ğ, ü, ö, ç, ı).
+
+            OCR METNİ:
+            {combined_text}
+
+            Şu bilgileri çıkar (varsa):
+            - Şirket adı / Ünvanı
+            - MERSIS numarası (16 rakam)
+            - VKN / Vergi numarası (10 rakam)
+            - Tam adres (şehir ve ilçe dahil)
+            - Şirket tipi (LIMITED, ANONIM, veya SAHIS)
+            - Yetkili kişi: ad, soyad, TC kimlik no, email, telefon
+
+            SADECE JSON formatında döndür. Bulunamayanlar için null kullan.
+            {{
+                "merchant_name": "...",
+                "trade_name": "...",
+                "mersis_number": "...",
+                "tax_number": "...",
+                "address": "...",
+                "city": "...",
+                "district": "...",
+                "company_type": "LIMITED/ANONIM/SAHIS",
+                "first_name": "...",
+                "last_name": "...",
+                "tc_number": "...",
+                "email": "...",
+                "phone": "..."
+            }}
+            """
+
+            task = Task(description=prompt)
+            result = agent.do(task)
+
+            # Parse AI response as JSON
+            try:
+                # Extract JSON from response
+                json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', result, re.DOTALL)
+                if json_match:
+                    extracted_data = json.loads(json_match.group())
+                else:
+                    # Fallback: extract with regex from OCR text
+                    extracted_data = extract_with_regex(combined_text)
+            except:
+                extracted_data = extract_with_regex(combined_text)
+        else:
+            # No OCR text, try filename extraction
+            for file in files:
+                sample_data = extract_from_filename(file.filename)
+                for key, value in sample_data.items():
+                    if value and not extracted_data.get(key):
+                        extracted_data[key] = value
+
+        # Clean and validate extracted data
+        extracted_data = clean_extracted_data(extracted_data)
+
+        return {
+            "success": True,
+            "extracted_data": extracted_data,
+            "files_processed": len(files),
+            "ocr_text_length": len(combined_text),
+            "message": f"{len(files)} belge başarıyla işlendi ve {len(extracted_data)} alan çıkarıldı"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
+
+
+def extract_with_regex(text: str) -> dict:
+    """Extract merchant information from OCR text using regex patterns"""
+    data = {}
+
+    # Extract MERSIS number (16 digits)
+    mersis_match = re.search(r'MERSIS[:\s]*([0-9]{16})|([0-9]{16})', text, re.IGNORECASE)
+    if mersis_match:
+        data["mersis_number"] = mersis_match.group(1) or mersis_match.group(2)
+
+    # Extract VKN/Tax Number (10 digits)
+    vkn_patterns = [
+        r'VKN[:\s]*([0-9]{10})',
+        r'VERGİ\s+NO[:\s]*([0-9]{10})',
+        r'VERGİ\s+KİMLİK\s+NO[:\s]*([0-9]{10})',
+        r'(?:^|\s)([0-9]{10})(?:\s|$)'
+    ]
+    for pattern in vkn_patterns:
+        vkn_match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+        if vkn_match:
+            data["tax_number"] = vkn_match.group(1)
+            break
+
+    # Extract TC Number (11 digits)
+    tc_match = re.search(r'T\.?C\.?\s*(?:KİMLİK\s+NO)?[:\s]*([0-9]{11})', text, re.IGNORECASE)
+    if tc_match:
+        data["tc_number"] = tc_match.group(1)
+
+    # Extract email
+    email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
+    if email_match:
+        data["email"] = email_match.group(0)
+
+    # Extract phone number (Turkish formats)
+    phone_patterns = [
+        r'(?:0|\+90)?[\s]?([0-9]{3})[\s]?([0-9]{3})[\s]?([0-9]{2})[\s]?([0-9]{2})',
+        r'(?:0|\+90)?[\s]?([0-9]{3})[\s]?([0-9]{7})'
+    ]
+    for pattern in phone_patterns:
+        phone_match = re.search(pattern, text)
+        if phone_match:
+            data["phone"] = ''.join(phone_match.groups())
+            break
+
+    # Extract company name patterns
+    company_patterns = [
+        r'((?:[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\s+){1,5}(?:LİMİTED|ANONİM|TİCARET|A\.Ş\.|LTD\.|ŞTİ\.))',
+        r'ÜNVAN[:\s]+(.*?)(?:\n|$)',
+        r'ŞİRKET\s+ADI[:\s]+(.*?)(?:\n|$)'
+    ]
+    for pattern in company_patterns:
+        name_match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+        if name_match:
+            data["merchant_name"] = name_match.group(1).strip()
+            break
+
+    # Extract address (look for common address patterns)
+    address_patterns = [
+        r'ADRES[:\s]+(.*?)(?:\n\n|$)',
+        r'(?:MAH(?:ALLE)?\.?|CAD(?:DE)?\.?|SOK(?:AK)?\.?).*?(?:\d+/\d+|\d+)',
+    ]
+    for pattern in address_patterns:
+        address_match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        if address_match:
+            data["address"] = address_match.group(1).strip() if address_match.lastindex else address_match.group(0).strip()
+            break
+
+    # Extract city (Turkish cities)
+    cities = ['İSTANBUL', 'ANKARA', 'İZMİR', 'BURSA', 'ANTALYA', 'ADANA', 'KOCAELİ', 'KONYA', 'GAZİANTEP', 'MERSİN']
+    for city in cities:
+        if city in text.upper():
+            data["city"] = city.title()
+            break
+
+    # Extract company type
+    if re.search(r'LİMİTED|LTD|L\.T\.D', text, re.IGNORECASE):
+        data["company_type"] = "LIMITED"
+    elif re.search(r'ANONİM|A\.Ş|A\.S\.', text, re.IGNORECASE):
+        data["company_type"] = "ANONIM"
+    elif re.search(r'ŞAHIS|ŞAHİS', text, re.IGNORECASE):
+        data["company_type"] = "SAHIS"
+
+    # Extract first and last name (look for authorized person)
+    name_patterns = [
+        r'YETKİLİ[:\s]+([A-ZÇĞİÖŞÜ][a-zçğıöşü]+)\s+([A-ZÇĞİÖŞÜ][a-zçğıöşü]+)',
+        r'(?:^|\n)([A-ZÇĞİÖŞÜ][a-zçğıöşü]+)\s+([A-ZÇĞİÖŞÜ][a-zçğıöşü]+)'
+    ]
+    for pattern in name_patterns:
+        name_match = re.search(pattern, text, re.MULTILINE)
+        if name_match:
+            data["first_name"] = name_match.group(1)
+            data["last_name"] = name_match.group(2)
+            break
+
+    return data
+
+
+def clean_extracted_data(data: dict) -> dict:
+    """Clean and validate extracted data"""
+    cleaned = {}
+
+    # Clean merchant_name
+    if data.get("merchant_name"):
+        name = data["merchant_name"].strip()
+        # Remove extra whitespace
+        name = re.sub(r'\s+', ' ', name)
+        cleaned["merchant_name"] = name
+
+    # Validate and clean MERSIS (must be 16 digits)
+    if data.get("mersis_number"):
+        mersis = re.sub(r'\D', '', str(data["mersis_number"]))
+        if len(mersis) == 16:
+            cleaned["mersis_number"] = mersis
+
+    # Validate and clean VKN (must be 10 digits)
+    if data.get("tax_number"):
+        vkn = re.sub(r'\D', '', str(data["tax_number"]))
+        if len(vkn) == 10:
+            cleaned["tax_number"] = vkn
+
+    # Clean address
+    if data.get("address"):
+        address = data["address"].strip()
+        address = re.sub(r'\s+', ' ', address)
+        cleaned["address"] = address
+
+    # Clean city
+    if data.get("city"):
+        cleaned["city"] = data["city"].strip().title()
+
+    # Clean district
+    if data.get("district"):
+        cleaned["district"] = data["district"].strip().title()
+
+    # Validate company_type
+    if data.get("company_type"):
+        company_type = data["company_type"].upper()
+        if company_type in ["LIMITED", "ANONIM", "SAHIS"]:
+            cleaned["company_type"] = company_type
+
+    # Clean first_name
+    if data.get("first_name"):
+        cleaned["first_name"] = data["first_name"].strip().title()
+
+    # Clean last_name
+    if data.get("last_name"):
+        cleaned["last_name"] = data["last_name"].strip().title()
+
+    # Validate and clean TC number (must be 11 digits)
+    if data.get("tc_number"):
+        tc = re.sub(r'\D', '', str(data["tc_number"]))
+        if len(tc) == 11:
+            cleaned["tc_number"] = tc
+
+    # Validate and clean email
+    if data.get("email"):
+        email = data["email"].strip().lower()
+        if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            cleaned["email"] = email
+
+    # Clean and format phone number
+    if data.get("phone"):
+        phone = re.sub(r'\D', '', str(data["phone"]))
+        # Ensure it starts with proper format
+        if phone.startswith('90'):
+            phone = phone[2:]
+        if phone.startswith('0'):
+            phone = phone[1:]
+        if len(phone) == 10:
+            cleaned["phone"] = f"0{phone}"
+
+    return cleaned
+
+
+def extract_from_filename(filename: str) -> dict:
+    """Extract information from filename patterns"""
+    data = {}
+
+    # Extract company name patterns
+    if "ticaret" in filename.lower() or "ltd" in filename.lower() or "anonim" in filename.lower():
+        name_match = re.search(r'([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)', filename)
+        if name_match:
+            data["merchant_name"] = name_match.group(1)
+
+    # Extract MERSIS (16 digits)
+    mersis_match = re.search(r'\b(\d{16})\b', filename)
+    if mersis_match:
+        data["mersis_number"] = mersis_match.group(1)
+
+    # Extract VKN (10 digits)
+    vkn_match = re.search(r'\b(\d{10})\b', filename)
+    if vkn_match and not mersis_match:
+        data["tax_number"] = vkn_match.group(1)
+
+    # Extract company type
+    if "limited" in filename.lower() or "ltd" in filename.lower():
+        data["company_type"] = "LIMITED"
+    elif "anonim" in filename.lower() or "a.s" in filename.lower() or "a.ş" in filename.lower():
+        data["company_type"] = "ANONIM"
+    elif "sahis" in filename.lower() or "şahıs" in filename.lower():
+        data["company_type"] = "SAHIS"
+
+    return data
+
+
+def create_ocr_agent():
+    """Create an agent specifically for OCR text extraction"""
+    return Agent(
+        model="ollama/llama3.2",
+        name="OCR Extraction Agent",
+        role="Document Processing Specialist",
+        goal="Extract structured merchant information from business documents",
+        instructions="""You are an OCR specialist that extracts merchant information from documents.
+        Focus on extracting:
+        - Company names and trade names
+        - Registration numbers (MERSIS, VKN)
+        - Addresses (with city and district)
+        - Contact information
+        - Authorized person details
+
+        Return data in clean JSON format."""
+    )
 
 if __name__ == "__main__":
     import uvicorn

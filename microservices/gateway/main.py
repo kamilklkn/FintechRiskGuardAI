@@ -1,11 +1,12 @@
 """API Gateway - Routes requests to appropriate microservices"""
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import httpx
 import os
 from datetime import datetime
+from typing import List
 
 app = FastAPI(title="API Gateway", version="1.0.0")
 
@@ -260,6 +261,25 @@ async def send_test_email(request: Request):
     body = await request.json()
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{EMAIL_SERVICE}/send-test-email", params={"email": body.get("email")})
+        return JSONResponse(content=response.json(), status_code=response.status_code)
+
+# ============ OCR DOCUMENT PROCESSING ============
+
+@app.post("/api/v1/ocr-documents")
+@app.post("/ocr-documents")
+async def ocr_documents(files: List[UploadFile] = File(...)):
+    """Process uploaded documents with OCR and extract merchant information"""
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        # Forward files to risk service for OCR processing
+        files_data = []
+        for file in files:
+            content = await file.read()
+            files_data.append(('files', (file.filename, content, file.content_type)))
+
+        response = await client.post(
+            f"{RISK_SERVICE}/ocr-extract",
+            files=files_data
+        )
         return JSONResponse(content=response.json(), status_code=response.status_code)
 
 if __name__ == "__main__":

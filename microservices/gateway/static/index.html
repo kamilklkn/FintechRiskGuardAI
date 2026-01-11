@@ -264,6 +264,33 @@
 
                 <!-- New Application Tab -->
                 <div id="new-application" class="tab-content active">
+                    <!-- Document Upload Section -->
+                    <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 20px;">
+                        <h3 style="color: white;"><i class="fas fa-file-upload"></i> Belge Yükle & Otomatik Doldur</h3>
+                        <p style="opacity: 0.9; margin-bottom: 15px;">Ticari sicil, vergi levhası, MERSIS belgesi veya sözleşme yükleyin. AI ile OCR yapılarak form otomatik doldurulacak.</p>
+
+                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                            <input type="file" id="document-upload" accept="image/*,.pdf" multiple
+                                   style="flex: 1; background: white; padding: 10px; border-radius: 6px; border: none;">
+                            <button type="button" onclick="processDocuments()" class="btn"
+                                    style="background: white; color: #667eea; border: none; font-weight: 600;">
+                                <i class="fas fa-magic"></i> OCR İşle
+                            </button>
+                        </div>
+
+                        <div id="upload-status" style="display: none; padding: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; margin-top: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Belgeler OCR ile işleniyor...</span>
+                            </div>
+                        </div>
+
+                        <div id="extracted-info" style="display: none; padding: 12px; background: rgba(255,255,255,0.95); border-radius: 6px; margin-top: 10px; color: #065f46;">
+                            <strong><i class="fas fa-check-circle"></i> Bilgiler başarıyla çıkarıldı!</strong>
+                            <div id="extracted-fields" style="margin-top: 8px; font-size: 13px;"></div>
+                        </div>
+                    </div>
+
                     <div class="card">
                         <h2><i class="fas fa-building"></i> Şirket Bilgileri</h2>
                         <form id="risk-application-form">

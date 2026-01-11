@@ -435,6 +435,112 @@ async function deleteSession(sessionId) {
 
 // ===== RISK SCORING SECTION =====
 
+// Process uploaded documents with OCR
+async function processDocuments() {
+    const fileInput = document.getElementById('document-upload');
+    const files = fileInput.files;
+
+    if (files.length === 0) {
+        showAlert('❌ Lütfen en az bir belge yükleyin', 'error');
+        return;
+    }
+
+    const statusEl = document.getElementById('upload-status');
+    const extractedEl = document.getElementById('extracted-info');
+
+    statusEl.style.display = 'block';
+    extractedEl.style.display = 'none';
+
+    const formData = new FormData();
+    for (let file of files) {
+        formData.append('files', file);
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/ocr-documents`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            statusEl.style.display = 'none';
+
+            // Fill form fields with extracted data
+            const extracted = data.extracted_data;
+            const fieldsUpdated = [];
+
+            if (extracted.merchant_name) {
+                document.getElementById('merchant_name').value = extracted.merchant_name;
+                fieldsUpdated.push('Üye İşyeri Adı');
+            }
+            if (extracted.trade_name) {
+                document.getElementById('trade_name').value = extracted.trade_name;
+                fieldsUpdated.push('Ticaret Ünvanı');
+            }
+            if (extracted.mersis_number) {
+                document.getElementById('mersis_number').value = extracted.mersis_number;
+                fieldsUpdated.push('MERSIS');
+            }
+            if (extracted.tax_number) {
+                document.getElementById('hosting_vkn').value = extracted.tax_number;
+                fieldsUpdated.push('VKN');
+            }
+            if (extracted.address) {
+                document.getElementById('address').value = extracted.address;
+                fieldsUpdated.push('Adres');
+            }
+            if (extracted.city) {
+                document.getElementById('city').value = extracted.city;
+                fieldsUpdated.push('Şehir');
+            }
+            if (extracted.district) {
+                document.getElementById('district').value = extracted.district;
+                fieldsUpdated.push('İlçe');
+            }
+            if (extracted.company_type) {
+                document.getElementById('company_type').value = extracted.company_type;
+                fieldsUpdated.push('Şirket Tipi');
+            }
+            if (extracted.first_name) {
+                document.getElementById('first_name').value = extracted.first_name;
+                fieldsUpdated.push('Ad');
+            }
+            if (extracted.last_name) {
+                document.getElementById('last_name').value = extracted.last_name;
+                fieldsUpdated.push('Soyad');
+            }
+            if (extracted.email) {
+                document.getElementById('email').value = extracted.email;
+                fieldsUpdated.push('E-posta');
+            }
+            if (extracted.phone) {
+                document.getElementById('mobile_phone').value = extracted.phone;
+                fieldsUpdated.push('Telefon');
+            }
+            if (extracted.tc_number) {
+                document.getElementById('tc_number').value = extracted.tc_number;
+                fieldsUpdated.push('TC No');
+            }
+
+            // Show extracted fields
+            extractedEl.style.display = 'block';
+            document.getElementById('extracted-fields').innerHTML =
+                `<strong>Doldurulan alanlar:</strong> ${fieldsUpdated.join(', ')}`;
+
+            showAlert(`✅ ${fieldsUpdated.length} alan başarıyla dolduruldu!`, 'success');
+
+        } else {
+            statusEl.style.display = 'none';
+            showAlert(`❌ OCR Hatası: ${data.detail || 'Belgeler işlenemedi'}`, 'error');
+        }
+    } catch (error) {
+        statusEl.style.display = 'none';
+        showAlert(`❌ Bağlantı hatası: ${error.message}`, 'error');
+    }
+}
+
 // Submit new risk application
 document.getElementById('risk-application-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
