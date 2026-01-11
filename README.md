@@ -1,8 +1,56 @@
-# RiskGuard AI 🛡️🤖
+# 🛡️ RiskGuard AI - AI-Powered Merchant Risk Scoring System
 
-**AI-Powered Merchant Risk Scoring System**
+Yapay zeka destekli, otomatik merchant risk değerlendirme ve skorlama sistemi. Ticari belgeleri OCR ile okuyup analiz eder, risk skorları üretir ve otomatik raporlar gönderir.
 
-Modern, ölçeklenebilir merchant risk skorlama sistemi. Yapay zeka destekli, mikroservis mimarisinde geliştirilmiş, tamamen lokal çalışan açık kaynak proje.
+## 🌟 Özellikler
+
+- 🤖 **AI-Powered Analysis**: Ollama/llama3.2 ile akıllı risk analizi
+- 📄 **OCR Document Processing**: Türkçe belgelerden otomatik veri çıkarma
+  - Ticaret Sicil Gazetesi
+  - Vergi Levhası
+  - MERSIS Belgesi
+  - İmza Sirküleri
+- 🎯 **Risk Scoring**: Çoklu veri kaynağı ile kapsamlı risk değerlendirme
+- 📧 **Automated Reporting**: Risk raporlarının otomatik e-posta gönderimi
+- 🏗️ **Microservices Architecture**: 6 bağımsız servis
+- 💾 **Session Management**: Konuşma geçmişi ve hafıza yönetimi
+- 🌐 **Modern Admin Panel**: Kullanıcı dostu web arayüzü
+
+## 🚀 Hızlı Başlangıç
+
+### Tek Komutla Başlat
+
+```bash
+./start.sh
+```
+
+Bu komut otomatik olarak:
+- ✅ Virtual environment oluşturur/aktifleştirir
+- ✅ Gerekli Python paketlerini yükler
+- ✅ Tesseract OCR'ı kontrol eder/yükler
+- ✅ Ollama servisini başlatır
+- ✅ llama3.2 modelini indirir (yoksa)
+- ✅ 6 microservisi başlatır
+- ✅ Tarayıcıda admin panelini açar
+
+### Admin Paneline Erişim
+```
+http://localhost:8000
+```
+
+### Durdurma
+
+```bash
+./stop.sh
+```
+
+## 📋 Gereksinimler
+
+- macOS (Apple Silicon veya Intel)
+- Python 3.8+
+- Homebrew package manager
+
+*Not: `start.sh` scripti tüm gereksinimleri otomatik yükler*
 
 ## 🎯 Ne Yapar?
 
