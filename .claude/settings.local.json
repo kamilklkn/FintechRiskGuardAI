@@ -12,7 +12,8 @@
       "Bash(pip3 install:*)",
       "Bash(ollama list:*)",
       "Bash(tree:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git pull:*)"
     ]
   }
 }
